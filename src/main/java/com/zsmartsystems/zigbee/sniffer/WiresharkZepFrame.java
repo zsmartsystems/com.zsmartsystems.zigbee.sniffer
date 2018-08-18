@@ -209,8 +209,8 @@ public class WiresharkZepFrame {
     }
 
     public void serializeInt16(int val) {
-        buffer[length++] = (byte) (val & 0xFF);
         buffer[length++] = (byte) ((val >> 8) & 0xFF);
+        buffer[length++] = (byte) (val & 0xFF);
     }
 
     public void serializeInt32(int val) {
@@ -221,14 +221,14 @@ public class WiresharkZepFrame {
     }
 
     public void serializeLong(long val) {
-        buffer[length++] = (byte) (val & 0xFF);
-        buffer[length++] = (byte) ((val >> 8) & 0xFF);
-        buffer[length++] = (byte) ((val >> 16) & 0xFF);
-        buffer[length++] = (byte) ((val >> 24) & 0xFF);
-        buffer[length++] = (byte) ((val >> 32) & 0xFF);
-        buffer[length++] = (byte) ((val >> 40) & 0xFF);
-        buffer[length++] = (byte) ((val >> 48) & 0xFF);
         buffer[length++] = (byte) ((val >> 56) & 0xFF);
+        buffer[length++] = (byte) ((val >> 48) & 0xFF);
+        buffer[length++] = (byte) ((val >> 40) & 0xFF);
+        buffer[length++] = (byte) ((val >> 32) & 0xFF);
+        buffer[length++] = (byte) ((val >> 24) & 0xFF);
+        buffer[length++] = (byte) ((val >> 16) & 0xFF);
+        buffer[length++] = (byte) ((val >> 8) & 0xFF);
+        buffer[length++] = (byte) (val & 0xFF);
     }
 
     public void serializeData(int[] valArray) {

@@ -142,7 +142,7 @@ public class ZigBeeSniffer {
                 zepFrame.setChannelId(channelId);
                 zepFrame.setData(data);
                 zepFrame.setSequence(sequence++);
-                System.out.println("rssi=" + rssi + ", " + zepFrame);
+                System.out.println(zepFrame);
 
                 byte[] buffer = zepFrame.getBuffer();
 
