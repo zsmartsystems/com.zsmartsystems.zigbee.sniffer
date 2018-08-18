@@ -36,6 +36,8 @@ import com.zsmartsystems.zigbee.transport.ZigBeePort.FlowControl;
  */
 public class ZigBeeSniffer {
     public static void main(final String[] args) {
+        final int ZEP_UDP_PORT = 17754;
+
         final String serialPortName;
         final Integer serialBaud;
         final Integer channelId;
@@ -109,9 +111,9 @@ public class ZigBeeSniffer {
             if (cmdline.hasOption("ipport")) {
                 clientPort = parseDecimalOrHexInt(cmdline.getOptionValue("ipport"));
             } else {
-                clientPort = 17754;
+                clientPort = ZEP_UDP_PORT;
             }
-            client = new DatagramSocket(17754);
+            client = new DatagramSocket(ZEP_UDP_PORT);
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -131,12 +133,16 @@ public class ZigBeeSniffer {
 
             @Override
             public synchronized void emberMfgLibPacketReceived(int linkQuality, int rssi, int[] data) {
+                // Patch FCS to be compatible with CC24xx format
+                data[data.length - 2] = rssi;
+                data[data.length - 1] = 0x80;
+
                 WiresharkZepFrame zepFrame = new WiresharkZepFrame();
                 zepFrame.setLqi(linkQuality);
                 zepFrame.setChannelId(channelId);
                 zepFrame.setData(data);
                 zepFrame.setSequence(sequence++);
-                System.out.println(zepFrame);
+                System.out.println("rssi=" + rssi + ", " + zepFrame);
 
                 byte[] buffer = zepFrame.getBuffer();
 
