@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-package com.zsmartsystems.zigbee.sniffer;
+package com.zsmartsystems.zigbee.sniffer.internal.wireshark;
 
 import java.util.Arrays;
 
@@ -130,7 +130,7 @@ public class WiresharkZepFrame {
      */
     protected static final long msb1baseTime = -2208988800000L;
 
-    WiresharkZepFrame() {
+    public WiresharkZepFrame() {
     }
 
     /**
@@ -284,11 +284,6 @@ public class WiresharkZepFrame {
         return seconds << 32 | fraction;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see java.lang.Object#toString()
-     */
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder(200);
