@@ -7,10 +7,15 @@
  */
 package com.zsmartsystems.zigbee.sniffer;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -19,11 +24,19 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
+import com.zsmartsystems.zigbee.IeeeAddress;
 import com.zsmartsystems.zigbee.ZigBeeChannel;
 import com.zsmartsystems.zigbee.dongle.ember.EmberMfglib;
 import com.zsmartsystems.zigbee.dongle.ember.EmberMfglibListener;
+import com.zsmartsystems.zigbee.dongle.ember.EmberNcp;
 import com.zsmartsystems.zigbee.dongle.ember.ZigBeeDongleEzsp;
 import com.zsmartsystems.zigbee.serial.ZigBeeSerialPort;
+import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsAdapter;
+import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsIsdLogFile;
+import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsPacketEm350Rx;
+import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsPrintf;
+import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsVersion;
+import com.zsmartsystems.zigbee.sniffer.internal.wireshark.WiresharkZepFrame;
 import com.zsmartsystems.zigbee.transport.ZigBeePort;
 import com.zsmartsystems.zigbee.transport.ZigBeePort.FlowControl;
 
@@ -46,6 +59,8 @@ public class ZigBeeSniffer {
         DatagramSocket client;
         InetAddress address;
 
+        final SilabsIsdLogFile isdFile;
+
         Options options = new Options();
         options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port")
                 .required().build());
@@ -58,7 +73,9 @@ public class ZigBeeSniffer {
         options.addOption(Option.builder("a").longOpt("ipaddr").hasArg().argName("remote IP address")
                 .desc("Set the remote IP address").build());
         options.addOption(Option.builder("r").longOpt("ipport").hasArg().argName("remote IP port")
-                .desc("Set the remote IP address").build());
+                .desc("Set the remote IP port").build());
+        options.addOption(Option.builder("s").longOpt("silabs").hasArg().argName("filename")
+                .desc("Log data to a Silabs ISD compatible event log").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
 
         CommandLine cmdline;
@@ -68,7 +85,7 @@ public class ZigBeeSniffer {
 
             if (cmdline.hasOption("help")) {
                 HelpFormatter formatter = new HelpFormatter();
-                formatter.printHelp("zigbeeconsole", options);
+                formatter.printHelp("ZigBeeSniffer", options);
                 return;
             }
             if (!cmdline.hasOption("port")) {
@@ -101,6 +118,17 @@ public class ZigBeeSniffer {
             return;
         }
 
+        if (cmdline.hasOption("silabs")) {
+            try {
+                isdFile = new SilabsIsdLogFile(cmdline.getOptionValue("silabs"));
+            } catch (FileNotFoundException | UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return;
+            }
+        } else {
+            isdFile = null;
+        }
+
         try {
             if (cmdline.hasOption("ipaddr")) {
                 address = InetAddress.getByName(cmdline.getOptionValue("ipaddr"));
@@ -128,17 +156,28 @@ public class ZigBeeSniffer {
         final ZigBeePort serialPort = new ZigBeeSerialPort(serialPortName, serialBaud, flowControl);
         System.out.println("Opened serial port " + serialPortName + " at " + serialBaud);
         final ZigBeeDongleEzsp dongle = new ZigBeeDongleEzsp(serialPort);
+
         EmberMfglib emberMfg = dongle.getEmberMfglib(new EmberMfglibListener() {
             private int sequence = 0;
+            private long startTime = System.nanoTime() - 10000000;
 
             @Override
-            public synchronized void emberMfgLibPacketReceived(int linkQuality, int rssi, int[] data) {
+            public synchronized void emberMfgLibPacketReceived(int lqi, int rssi, int[] data) {
+                SilabsPacketEm350Rx silabsPacket = new SilabsPacketEm350Rx();
+                silabsPacket.setSequence(sequence & 0xFF);
+                silabsPacket.setTimestamp((System.nanoTime() - startTime) / 1000);
+                silabsPacket.setData(data);
+                silabsPacket.setLqi(lqi);
+                silabsPacket.setRssi(rssi);
+                silabsPacket.setChannel(channelId);
+                isdFile.write(silabsPacket);
+
                 // Patch FCS to be compatible with CC24xx format
                 data[data.length - 2] = rssi;
                 data[data.length - 1] = 0x80;
 
                 WiresharkZepFrame zepFrame = new WiresharkZepFrame();
-                zepFrame.setLqi(linkQuality);
+                zepFrame.setLqi(lqi);
                 zepFrame.setChannelId(channelId);
                 zepFrame.setData(data);
                 zepFrame.setSequence(sequence++);
@@ -155,18 +194,59 @@ public class ZigBeeSniffer {
                 }
             }
         });
+
+        String ncpVersion = dongle.getFirmwareVersion();
+        System.out.println("Ember NCP version is " + ncpVersion);
+
+        EmberNcp emberNcp = dongle.getEmberNcp();
+        IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
+        System.out.println("Local EUI is " + localIeeeAddress);
+
         if (!emberMfg.doMfglibStart()) {
             System.err.println("Error starting Ember mfglib");
             dongle.shutdown();
             client.close();
+            if (isdFile != null) {
+                isdFile.close();
+            }
             return;
         }
         if (!emberMfg.doMfglibSetChannel(ZigBeeChannel.create(channelId))) {
             System.err.println("Error setting Ember channel");
             dongle.shutdown();
             client.close();
+            if (isdFile != null) {
+                isdFile.close();
+            }
             return;
         }
+
+        if (isdFile != null) {
+            SilabsAdapter adapter = new SilabsAdapter();
+            adapter.setAddress(localIeeeAddress);
+            isdFile.write(adapter);
+            SilabsVersion version = new SilabsVersion();
+            version.setVersion(dongle.getFirmwareVersion());
+            isdFile.write(version);
+            DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            Date date = new Date();
+            SilabsPrintf printf = new SilabsPrintf();
+            printf.setString("Logging started at " + dateFormat.format(date));
+            isdFile.write(printf);
+        }
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                emberMfg.doMfglibEnd();
+                dongle.shutdown();
+                client.close();
+
+                if (isdFile != null) {
+                    isdFile.close();
+                }
+            }
+        }));
 
         try {
             System.in.read();
@@ -174,9 +254,6 @@ public class ZigBeeSniffer {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        emberMfg.doMfglibEnd();
-        dongle.shutdown();
-        client.close();
     }
 
     /**
