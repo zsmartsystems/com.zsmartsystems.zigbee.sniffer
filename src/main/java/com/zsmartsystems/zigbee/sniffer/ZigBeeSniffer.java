@@ -42,24 +42,28 @@ import com.zsmartsystems.zigbee.transport.ZigBeePort.FlowControl;
 
 /**
  * This class uses the {@link ZigBeeDongleEzsp} class to create a ZigBee sniffer and make the data available to
- * Wireshark.
+ * Wireshark and optionally write to a Silabs ISD event file.
  *
  * @author Chris Jackson
  *
  */
 public class ZigBeeSniffer {
+    static Integer channelId;
+    static int clientPort;
+    static DatagramSocket client;
+    static InetAddress address;
+    static SilabsIsdLogFile isdFile;
+    static long startTime = System.nanoTime();
+    static ZigBeeDongleEzsp dongle;
+    static EmberMfglib emberMfg;
+    static EmberNcp emberNcp;
+
     public static void main(final String[] args) {
         final int ZEP_UDP_PORT = 17754;
 
         final String serialPortName;
         final Integer serialBaud;
-        final Integer channelId;
         FlowControl flowControl = null;
-        final int clientPort;
-        DatagramSocket client;
-        InetAddress address;
-
-        final SilabsIsdLogFile isdFile;
 
         Options options = new Options();
         options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port")
@@ -155,71 +159,28 @@ public class ZigBeeSniffer {
 
         final ZigBeePort serialPort = new ZigBeeSerialPort(serialPortName, serialBaud, flowControl);
         System.out.println("Opened serial port " + serialPortName + " at " + serialBaud);
-        final ZigBeeDongleEzsp dongle = new ZigBeeDongleEzsp(serialPort);
+        dongle = new ZigBeeDongleEzsp(serialPort);
 
-        EmberMfglib emberMfg = dongle.getEmberMfglib(new EmberMfglibListener() {
+        emberMfg = dongle.getEmberMfglib(new EmberMfglibListener() {
             private int sequence = 0;
-            private long startTime = System.nanoTime() - 10000000;
 
             @Override
             public synchronized void emberMfgLibPacketReceived(int lqi, int rssi, int[] data) {
-                SilabsPacketEm350Rx silabsPacket = new SilabsPacketEm350Rx();
-                silabsPacket.setSequence(sequence & 0xFF);
-                silabsPacket.setTimestamp((System.nanoTime() - startTime) / 1000);
-                silabsPacket.setData(data);
-                silabsPacket.setLqi(lqi);
-                silabsPacket.setRssi(rssi);
-                silabsPacket.setChannel(channelId);
-                isdFile.write(silabsPacket);
-
-                // Patch FCS to be compatible with CC24xx format
-                data[data.length - 2] = rssi;
-                data[data.length - 1] = 0x80;
-
-                WiresharkZepFrame zepFrame = new WiresharkZepFrame();
-                zepFrame.setLqi(lqi);
-                zepFrame.setChannelId(channelId);
-                zepFrame.setData(data);
-                zepFrame.setSequence(sequence++);
-                System.out.println(zepFrame);
-
-                byte[] buffer = zepFrame.getBuffer();
-
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, clientPort);
-                try {
-                    client.send(packet);
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                packetReceived(sequence++, lqi, rssi, data);
             }
         });
 
         String ncpVersion = dongle.getFirmwareVersion();
-        System.out.println("Ember NCP version is " + ncpVersion);
+        if (ncpVersion.equals("")) {
+            System.err.println("Unable to communicate with Ember NCP");
+            shutdown();
+            return;
+        }
+        System.out.println("Ember NCP version : " + ncpVersion);
 
-        EmberNcp emberNcp = dongle.getEmberNcp();
+        emberNcp = dongle.getEmberNcp();
         IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
-        System.out.println("Local EUI is " + localIeeeAddress);
-
-        if (!emberMfg.doMfglibStart()) {
-            System.err.println("Error starting Ember mfglib");
-            dongle.shutdown();
-            client.close();
-            if (isdFile != null) {
-                isdFile.close();
-            }
-            return;
-        }
-        if (!emberMfg.doMfglibSetChannel(ZigBeeChannel.create(channelId))) {
-            System.err.println("Error setting Ember channel");
-            dongle.shutdown();
-            client.close();
-            if (isdFile != null) {
-                isdFile.close();
-            }
-            return;
-        }
+        System.out.println("Ember NCP EUI     : " + localIeeeAddress);
 
         if (isdFile != null) {
             SilabsAdapter adapter = new SilabsAdapter();
@@ -235,24 +196,67 @@ public class ZigBeeSniffer {
             isdFile.write(printf);
         }
 
+        if (!emberMfg.doMfglibStart()) {
+            System.err.println("Error starting Ember mfglib");
+            shutdown();
+            return;
+        }
+        if (!emberMfg.doMfglibSetChannel(ZigBeeChannel.create(channelId))) {
+            System.err.println("Error setting Ember channel");
+            shutdown();
+            return;
+        }
+
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override
             public void run() {
-                emberMfg.doMfglibEnd();
-                dongle.shutdown();
-                client.close();
-
-                if (isdFile != null) {
-                    isdFile.close();
-                }
+                shutdown();
             }
         }));
 
         try {
             System.in.read();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
+        }
+    }
+
+    private static void packetReceived(int sequence, int lqi, int rssi, int[] data) {
+        if (isdFile != null) {
+            SilabsPacketEm350Rx silabsPacket = new SilabsPacketEm350Rx();
+            silabsPacket.setSequence(sequence & 0xFF);
+            silabsPacket.setTimestamp((System.nanoTime() - startTime) / 1000);
+            silabsPacket.setData(data);
+            silabsPacket.setLqi(lqi);
+            silabsPacket.setRssi(rssi);
+            silabsPacket.setChannel(channelId);
+            isdFile.write(silabsPacket);
+        }
+
+        WiresharkZepFrame zepFrame = new WiresharkZepFrame();
+        zepFrame.setLqi(lqi);
+        zepFrame.setChannelId(channelId);
+        zepFrame.setData(data);
+        zepFrame.setSequence(sequence);
+        System.out.println(zepFrame);
+
+        byte[] buffer = zepFrame.getBuffer();
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, clientPort);
+        try {
+            client.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void shutdown() {
+        if (emberMfg != null) {
+            emberMfg.doMfglibEnd();
+        }
+        dongle.shutdown();
+        client.close();
+        if (isdFile != null) {
+            isdFile.close();
         }
     }
 
