@@ -115,9 +115,9 @@ public class WiresharkZepFrame {
     private int lqi;
     private boolean lqiMode = false;
     private int sequence;
-    private int timestamp;
-    private int type;
-    private int protocolVersion;
+    private int rssi;
+    private int protocolType = 1;
+    private int protocolVersion = 2;
     private int[] data;
 
     /**
@@ -176,21 +176,18 @@ public class WiresharkZepFrame {
     }
 
     /**
-     * @param timestamp the timestamp to set
+     * @param type the protocolType to set
      */
-    public void setTimestamp(int timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    /**
-     * @param type the type to set
-     */
-    public void setType(int type) {
-        this.type = type;
+    public void setProtocolType(int protocolType) {
+        this.protocolType = protocolType;
     }
 
     public void setData(int[] data) {
-        this.data = data;
+        this.data = Arrays.copyOf(data, data.length);
+    }
+
+    public void serRssi(int rssi) {
+        this.rssi = rssi;
     }
 
     /**
@@ -238,10 +235,14 @@ public class WiresharkZepFrame {
     }
 
     public byte[] getBuffer() {
+        // Patch FCS to be compatible with CC24xx format
+        data[data.length - 2] = rssi;
+        data[data.length - 1] = 0x80;
+
         serializeInt8(0x45);
         serializeInt8(0x58);
-        serializeInt8(2); // Version
-        serializeInt8(1); // Type
+        serializeInt8(protocolVersion);
+        serializeInt8(protocolType);
         serializeInt8(channelId);
         serializeInt16(deviceId);
         serializeBoolean(lqiMode);
