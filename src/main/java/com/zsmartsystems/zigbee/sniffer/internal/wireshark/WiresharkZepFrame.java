@@ -107,7 +107,7 @@ import java.util.Arrays;
  *
  */
 public class WiresharkZepFrame {
-    private byte[] buffer = new byte[131];
+    private byte[] buffer = new byte[180];
     private int length = 0;
 
     private int channelId;

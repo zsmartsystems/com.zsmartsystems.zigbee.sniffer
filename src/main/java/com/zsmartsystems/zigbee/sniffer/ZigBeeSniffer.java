@@ -65,6 +65,8 @@ public class ZigBeeSniffer {
         final Integer serialBaud;
         FlowControl flowControl = null;
 
+        System.out.println("Z-Smart Systems Ember Packet Sniffer");
+
         Options options = new Options();
         options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port")
                 .required().build());
@@ -176,11 +178,11 @@ public class ZigBeeSniffer {
             shutdown();
             return;
         }
-        System.out.println("Ember NCP version : " + ncpVersion);
+        System.out.println("Ember NCP version     : " + ncpVersion);
 
         emberNcp = dongle.getEmberNcp();
         IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
-        System.out.println("Ember NCP EUI     : " + localIeeeAddress);
+        System.out.println("Ember NCP EUI         : " + localIeeeAddress);
 
         if (isdFile != null) {
             SilabsAdapter adapter = new SilabsAdapter();
@@ -207,18 +209,18 @@ public class ZigBeeSniffer {
             return;
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            @Override
-            public void run() {
-                shutdown();
-            }
-        }));
+        System.out.println("Wireshark destination : " + address + ":" + clientPort);
+        System.out.println("Logging on channel    : " + channelId);
 
         try {
             System.in.read();
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        shutdown();
+
+        System.out.println("Sniffer closed.");
     }
 
     private static void packetReceived(int sequence, int lqi, int rssi, int[] data) {
