@@ -20,3 +20,4 @@ usage: ZigBeeSniffer
 java -jar ZigBeeSniffer.jar -port /dev/tty.SLAB_USBtoUART -baud 115200 -flow hardware
 ```
 
+A compiled JAR file can be found [here](https://www.cd-jackson.com/downloads/ZigBeeSniffer.jar).
