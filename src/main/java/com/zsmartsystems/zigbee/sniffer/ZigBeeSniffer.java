@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016-2018 by the respective copyright holders.
+ * Copyright (c) 2016-2018 by Z-Smart Systems.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -16,6 +16,7 @@ import java.net.InetAddress;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.TimeZone;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -36,6 +37,9 @@ import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsIsdLogFile;
 import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsPacketEm350Rx;
 import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsPrintf;
 import com.zsmartsystems.zigbee.sniffer.internal.silabs.SilabsVersion;
+import com.zsmartsystems.zigbee.sniffer.internal.wireshark.WiresharkPcapFile;
+import com.zsmartsystems.zigbee.sniffer.internal.wireshark.WiresharkPcapFrame;
+import com.zsmartsystems.zigbee.sniffer.internal.wireshark.WiresharkPcapHeader;
 import com.zsmartsystems.zigbee.sniffer.internal.wireshark.WiresharkZepFrame;
 import com.zsmartsystems.zigbee.transport.ZigBeePort;
 import com.zsmartsystems.zigbee.transport.ZigBeePort.FlowControl;
@@ -53,10 +57,12 @@ public class ZigBeeSniffer {
     static DatagramSocket client;
     static InetAddress address;
     static SilabsIsdLogFile isdFile;
+    static WiresharkPcapFile pcapFile;
     static long startTime = System.nanoTime();
     static ZigBeeDongleEzsp dongle;
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
+    static long timezone = 0;
 
     public static void main(final String[] args) {
         final int ZEP_UDP_PORT = 17754;
@@ -82,6 +88,9 @@ public class ZigBeeSniffer {
                 .desc("Set the remote IP port").build());
         options.addOption(Option.builder("s").longOpt("silabs").hasArg().argName("filename")
                 .desc("Log data to a Silabs ISD compatible event log").build());
+        options.addOption(Option.builder("p").longOpt("pcap").hasArg().argName("filename")
+                .desc("Log data to a Wireshark pcap compatible log").build());
+        options.addOption(Option.builder("l").longOpt("local").desc("Log times in local time").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
 
         CommandLine cmdline;
@@ -124,6 +133,12 @@ public class ZigBeeSniffer {
             return;
         }
 
+        if (cmdline.hasOption("local")) {
+            TimeZone tz = TimeZone.getDefault();
+            timezone = tz.getOffset(new Date().getTime());
+
+            System.out.println("Using timezone " + tz.getDisplayName() + " (" + timezone + ")");
+        }
         if (cmdline.hasOption("silabs")) {
             try {
                 isdFile = new SilabsIsdLogFile(cmdline.getOptionValue("silabs"));
@@ -133,6 +148,25 @@ public class ZigBeeSniffer {
             }
         } else {
             isdFile = null;
+        }
+
+        if (cmdline.hasOption("pcap")) {
+            try {
+                pcapFile = new WiresharkPcapFile(cmdline.getOptionValue("pcap"));
+
+                WiresharkPcapHeader header = new WiresharkPcapHeader();
+                header.setMagicNumber(WiresharkPcapFile.MAGIC_NUMBER_STANDARD);
+                header.setNetwork(WiresharkPcapFile.LINKTYPE_IEEE802_15_4_WITHFCS);
+                header.setSnapLen(256);
+                header.setThisZone((int) timezone);
+                header.setSigFigs(3);
+                pcapFile.write(header);
+            } catch (FileNotFoundException | UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return;
+            }
+        } else {
+            pcapFile = null;
         }
 
         try {
@@ -224,6 +258,8 @@ public class ZigBeeSniffer {
     }
 
     private static void packetReceived(int sequence, int lqi, int rssi, int[] data) {
+        long captureMillis = System.currentTimeMillis();
+
         if (isdFile != null) {
             SilabsPacketEm350Rx silabsPacket = new SilabsPacketEm350Rx();
             silabsPacket.setSequence(sequence & 0xFF);
@@ -235,11 +271,22 @@ public class ZigBeeSniffer {
             isdFile.write(silabsPacket);
         }
 
+        if (pcapFile != null) {
+            long seconds = (captureMillis + timezone) / 1000;
+            WiresharkPcapFrame pcapPacket = new WiresharkPcapFrame();
+            pcapPacket.setSeconds((int) (seconds));
+            pcapPacket.setMicroseconds((int) (captureMillis - (seconds * 1000)) * 1000);
+            pcapPacket.setData(data);
+
+            pcapFile.write(pcapPacket);
+        }
+
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
         zepFrame.setLqi(lqi);
         zepFrame.setChannelId(channelId);
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
+        zepFrame.setTimestamp(captureMillis + timezone);
         System.out.println(zepFrame);
 
         byte[] buffer = zepFrame.getBuffer();
@@ -254,11 +301,17 @@ public class ZigBeeSniffer {
     private static void shutdown() {
         if (emberMfg != null) {
             emberMfg.doMfglibEnd();
+            emberMfg = null;
         }
         dongle.shutdown();
         client.close();
         if (isdFile != null) {
             isdFile.close();
+            isdFile = null;
+        }
+        if (pcapFile != null) {
+            pcapFile.close();
+            pcapFile = null;
         }
     }
 

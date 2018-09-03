@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016-2018 by the respective copyright holders.
+ * Copyright (c) 2016-2018 by Z-Smart Systems.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,8 @@
 package com.zsmartsystems.zigbee.sniffer.internal.wireshark;
 
 import java.util.Arrays;
+
+import com.zsmartsystems.zigbee.sniffer.internal.ZigBeeSnifferBinaryFrame;
 
 /**
  * A class to encapsulate the ZigBee Encapsulation Protocol for Wireshark
@@ -106,19 +108,16 @@ import java.util.Arrays;
  * @author Chris Jackson
  *
  */
-public class WiresharkZepFrame {
-    private byte[] buffer = new byte[180];
-    private int length = 0;
-
+public class WiresharkZepFrame extends ZigBeeSnifferBinaryFrame {
     private int channelId;
     private int deviceId = 1;
     private int lqi;
     private boolean lqiMode = false;
     private int sequence;
     private int rssi;
+    private long timestamp;
     private int protocolType = 1;
     private int protocolVersion = 2;
-    private int[] data;
 
     /**
      * baseline NTP time if bit-0=0 -> 7-Feb-2036 @ 06:28:16 UTC
@@ -182,10 +181,6 @@ public class WiresharkZepFrame {
         this.protocolType = protocolType;
     }
 
-    public void setData(int[] data) {
-        this.data = Arrays.copyOf(data, data.length);
-    }
-
     public void serRssi(int rssi) {
         this.rssi = rssi;
     }
@@ -197,41 +192,8 @@ public class WiresharkZepFrame {
         this.protocolVersion = protocolVersion;
     }
 
-    public void serializeBoolean(boolean val) {
-        buffer[length++] = (byte) (val ? 0x01 : 0x00);
-    }
-
-    public void serializeInt8(int val) {
-        buffer[length++] = (byte) (val & 0xFF);
-    }
-
-    public void serializeInt16(int val) {
-        buffer[length++] = (byte) ((val >> 8) & 0xFF);
-        buffer[length++] = (byte) (val & 0xFF);
-    }
-
-    public void serializeInt32(int val) {
-        buffer[length++] = (byte) ((val >> 24) & 0xFF);
-        buffer[length++] = (byte) ((val >> 16) & 0xFF);
-        buffer[length++] = (byte) ((val >> 8) & 0xFF);
-        buffer[length++] = (byte) (val & 0xFF);
-    }
-
-    public void serializeLong(long val) {
-        buffer[length++] = (byte) ((val >> 56) & 0xFF);
-        buffer[length++] = (byte) ((val >> 48) & 0xFF);
-        buffer[length++] = (byte) ((val >> 40) & 0xFF);
-        buffer[length++] = (byte) ((val >> 32) & 0xFF);
-        buffer[length++] = (byte) ((val >> 24) & 0xFF);
-        buffer[length++] = (byte) ((val >> 16) & 0xFF);
-        buffer[length++] = (byte) ((val >> 8) & 0xFF);
-        buffer[length++] = (byte) (val & 0xFF);
-    }
-
-    public void serializeData(int[] valArray) {
-        for (int valByte : valArray) {
-            buffer[length++] = (byte) valByte;
-        }
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 
     public byte[] getBuffer() {
@@ -247,7 +209,7 @@ public class WiresharkZepFrame {
         serializeInt16(deviceId);
         serializeBoolean(lqiMode);
         serializeInt8(lqi);
-        serializeLong(toNtpTime(System.currentTimeMillis()));
+        serializeLong(toNtpTime(timestamp));
         serializeInt32(sequence);
 
         // Reserved bytes
