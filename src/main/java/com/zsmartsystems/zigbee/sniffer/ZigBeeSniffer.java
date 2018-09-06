@@ -88,7 +88,7 @@ public class ZigBeeSniffer {
                 .desc("Set the remote IP port").build());
         options.addOption(Option.builder("s").longOpt("silabs").hasArg().argName("filename")
                 .desc("Log data to a Silabs ISD compatible event log").build());
-        options.addOption(Option.builder("p").longOpt("pcap").hasArg().argName("filename")
+        options.addOption(Option.builder("w").longOpt("pcap").hasArg().argName("filename")
                 .desc("Log data to a Wireshark pcap compatible log").build());
         options.addOption(Option.builder("l").longOpt("local").desc("Log times in local time").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
