@@ -12,6 +12,7 @@ usage: ZigBeeSniffer
 -c,--channel <channel id>         Set the ZigBee channel ID
 -f,--flow <type>                  Set the flow control (none | hardware | software)
 -l,--local                        Log times in local time
+-m,--maxpcap <length>             Maximum filesize for Wireshark files
 -p,--port <port name>             Set the port
 -r,--ipport <remote IP port>      Set the remote IP port
 -s,--silabs <filename>            Log data to a Silabs ISD compatible event log
