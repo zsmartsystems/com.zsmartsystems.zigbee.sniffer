@@ -61,6 +61,7 @@ import java.io.UnsupportedEncodingException;
  */
 public class WiresharkPcapFile {
     private BufferedOutputStream output;
+    private int bytesWritten;
 
     public static int MAGIC_NUMBER_STANDARD = 0xa1b2c3d4;
 
@@ -74,7 +75,9 @@ public class WiresharkPcapFile {
 
     public void write(WiresharkPcapFrame frame) {
         try {
-            output.write(frame.getBuffer());
+            byte[] buffer = frame.getBuffer();
+            bytesWritten += buffer.length;
+            output.write(buffer);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
@@ -91,11 +94,17 @@ public class WiresharkPcapFile {
         }
     }
 
+    public int getLength() {
+        return bytesWritten;
+    }
+
     public void write(WiresharkPcapHeader header) {
         header.setVersionMajor(2);
         header.setVersionMinor(4);
         try {
-            output.write(header.getBuffer());
+            byte[] buffer = header.getBuffer();
+            bytesWritten += buffer.length;
+            output.write(buffer);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

@@ -63,6 +63,9 @@ public class ZigBeeSniffer {
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
     static long timezone = 0;
+    static int wiresharkFileLength = Integer.MAX_VALUE;
+    static int wiresharkCounter = 0;
+    static String wiresharkFilename;
 
     public static void main(final String[] args) {
         final int ZEP_UDP_PORT = 17754;
@@ -90,6 +93,8 @@ public class ZigBeeSniffer {
                 .desc("Log data to a Silabs ISD compatible event log").build());
         options.addOption(Option.builder("w").longOpt("pcap").hasArg().argName("filename")
                 .desc("Log data to a Wireshark pcap compatible log").build());
+        options.addOption(Option.builder("m").longOpt("maxpcap").hasArg().argName("length")
+                .desc("Maximum filesize for Wireshark files").build());
         options.addOption(Option.builder("l").longOpt("local").desc("Log times in local time").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
 
@@ -150,21 +155,14 @@ public class ZigBeeSniffer {
             isdFile = null;
         }
 
-        if (cmdline.hasOption("pcap")) {
-            try {
-                pcapFile = new WiresharkPcapFile(cmdline.getOptionValue("pcap"));
+        if (cmdline.hasOption("maxpcap")) {
+            wiresharkFileLength = parseDecimalOrHexInt(cmdline.getOptionValue("maxpcap"));
+            wiresharkCounter = 1;
+        }
 
-                WiresharkPcapHeader header = new WiresharkPcapHeader();
-                header.setMagicNumber(WiresharkPcapFile.MAGIC_NUMBER_STANDARD);
-                header.setNetwork(WiresharkPcapFile.LINKTYPE_IEEE802_15_4_WITHFCS);
-                header.setSnapLen(256);
-                header.setThisZone((int) timezone);
-                header.setSigFigs(3);
-                pcapFile.write(header);
-            } catch (FileNotFoundException | UnsupportedEncodingException e) {
-                e.printStackTrace();
-                return;
-            }
+        if (cmdline.hasOption("pcap")) {
+            wiresharkFilename = cmdline.getOptionValue("pcap");
+            openPcapFile(wiresharkFilename, wiresharkCounter);
         } else {
             pcapFile = null;
         }
@@ -279,6 +277,14 @@ public class ZigBeeSniffer {
             pcapPacket.setData(data);
 
             pcapFile.write(pcapPacket);
+
+            if (pcapFile.getLength() > wiresharkFileLength) {
+                System.out.println(
+                        "Breaking wireshark file " + wiresharkCounter + " at " + pcapFile.getLength() + " bytes.");
+                pcapFile.close();
+                wiresharkCounter++;
+                openPcapFile(wiresharkFilename, wiresharkCounter);
+            }
         }
 
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
@@ -329,5 +335,29 @@ public class ZigBeeSniffer {
             radix = 16;
         }
         return Integer.parseInt(number, radix);
+    }
+
+    private static void openPcapFile(String filename, int counter) {
+        try {
+            String file;
+            if (counter == 0) {
+                file = filename + ".pcap";
+            } else {
+                file = filename + String.format("-%04d.pcap", counter);
+            }
+            pcapFile = new WiresharkPcapFile(file);
+
+            WiresharkPcapHeader header = new WiresharkPcapHeader();
+            header.setMagicNumber(WiresharkPcapFile.MAGIC_NUMBER_STANDARD);
+            header.setNetwork(WiresharkPcapFile.LINKTYPE_IEEE802_15_4_WITHFCS);
+            header.setSnapLen(256);
+            header.setThisZone((int) timezone);
+            header.setSigFigs(3);
+            pcapFile.write(header);
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            e.printStackTrace();
+            pcapFile = null;
+        }
+
     }
 }
