@@ -7,8 +7,10 @@
  */
 package com.zsmartsystems.zigbee.sniffer;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -66,6 +68,9 @@ public class ZigBeeSniffer {
     static int wiresharkFileLength = Integer.MAX_VALUE;
     static int wiresharkCounter = 0;
     static String wiresharkFilename;
+    static int sequence = 0;
+    static long captureMillis;
+    static long restartTimer = 30000;
 
     public static void main(final String[] args) {
         final int ZEP_UDP_PORT = 17754;
@@ -95,6 +100,8 @@ public class ZigBeeSniffer {
                 .desc("Log data to a Wireshark pcap compatible log").build());
         options.addOption(Option.builder("m").longOpt("maxpcap").hasArg().argName("length")
                 .desc("Maximum filesize for Wireshark files").build());
+        options.addOption(Option.builder("t").longOpt("timeout").hasArg().argName("seconds")
+                .desc("NCP restart timeout in seconds").build());
         options.addOption(Option.builder("l").longOpt("local").desc("Log times in local time").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
 
@@ -155,6 +162,10 @@ public class ZigBeeSniffer {
             isdFile = null;
         }
 
+        if (cmdline.hasOption("timeout")) {
+            restartTimer = parseDecimalOrHexInt(cmdline.getOptionValue("timeout")) * 1000;
+        }
+
         if (cmdline.hasOption("maxpcap")) {
             wiresharkFileLength = parseDecimalOrHexInt(cmdline.getOptionValue("maxpcap"));
             wiresharkCounter = 1;
@@ -191,72 +202,43 @@ public class ZigBeeSniffer {
             channelId = 11;
         }
 
-        final ZigBeePort serialPort = new ZigBeeSerialPort(serialPortName, serialBaud, flowControl);
-        System.out.println("Opened serial port " + serialPortName + " at " + serialBaud);
-        dongle = new ZigBeeDongleEzsp(serialPort);
-
-        emberMfg = dongle.getEmberMfglib(new EmberMfglibListener() {
-            private int sequence = 0;
-
-            @Override
-            public synchronized void emberMfgLibPacketReceived(int lqi, int rssi, int[] data) {
-                packetReceived(sequence++, lqi, rssi, data);
-            }
-        });
-
-        String ncpVersion = dongle.getFirmwareVersion();
-        if (ncpVersion.equals("")) {
-            System.err.println("Unable to communicate with Ember NCP");
-            shutdown();
-            return;
-        }
-        System.out.println("Ember NCP version     : " + ncpVersion);
-
-        emberNcp = dongle.getEmberNcp();
-        IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
-        System.out.println("Ember NCP EUI         : " + localIeeeAddress);
-
-        if (isdFile != null) {
-            SilabsAdapter adapter = new SilabsAdapter();
-            adapter.setAddress(localIeeeAddress);
-            isdFile.write(adapter);
-            SilabsVersion version = new SilabsVersion();
-            version.setVersion(dongle.getFirmwareVersion());
-            isdFile.write(version);
-            DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-            Date date = new Date();
-            SilabsPrintf printf = new SilabsPrintf();
-            printf.setString("Logging started at " + dateFormat.format(date));
-            isdFile.write(printf);
-        }
-
-        if (!emberMfg.doMfglibStart()) {
-            System.err.println("Error starting Ember mfglib");
-            shutdown();
-            return;
-        }
-        if (!emberMfg.doMfglibSetChannel(ZigBeeChannel.create(channelId))) {
-            System.err.println("Error setting Ember channel");
-            shutdown();
-            return;
-        }
-
-        System.out.println("Wireshark destination : " + address + ":" + clientPort);
-        System.out.println("Logging on channel    : " + channelId);
-
         try {
-            System.in.read();
-        } catch (IOException e) {
+            BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+            while (!in.ready()) {
+                System.out.println("NCP initialisation starting...");
+
+                if (initialiseNcp(serialPortName, serialBaud, flowControl) == false) {
+                    System.out.println("Unable to initialise NCP");
+                    return;
+                }
+
+                System.out.println("NCP initialisation complete...");
+                System.out.println("Wireshark destination : " + address + ":" + clientPort);
+                System.out.println("Logging on channel    : " + channelId);
+
+                captureMillis = System.currentTimeMillis();
+                while (!in.ready()) {
+                    if (captureMillis < System.currentTimeMillis() - restartTimer) {
+                        System.out.println(
+                                "No NCP data received for " + (restartTimer / 1000) + " seconds. Restarting NCP!");
+                        break;
+                    }
+                    Thread.sleep(250);
+                }
+
+                System.out.println("NCP shutting down...");
+                shutdownNcp();
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
         shutdown();
-
         System.out.println("Sniffer closed.");
     }
 
     private static void packetReceived(int sequence, int lqi, int rssi, int[] data) {
-        long captureMillis = System.currentTimeMillis();
+        captureMillis = System.currentTimeMillis();
 
         if (isdFile != null) {
             SilabsPacketEm350Rx silabsPacket = new SilabsPacketEm350Rx();
@@ -304,12 +286,17 @@ public class ZigBeeSniffer {
         }
     }
 
-    private static void shutdown() {
+    private static void shutdownNcp() {
         if (emberMfg != null) {
             emberMfg.doMfglibEnd();
             emberMfg = null;
         }
         dongle.shutdown();
+    }
+
+    private static void shutdown() {
+        shutdownNcp();
+
         client.close();
         if (isdFile != null) {
             isdFile.close();
@@ -358,6 +345,57 @@ public class ZigBeeSniffer {
             e.printStackTrace();
             pcapFile = null;
         }
+    }
 
+    private static boolean initialiseNcp(String serialPortName, int serialBaud, FlowControl flowControl) {
+        final ZigBeePort serialPort = new ZigBeeSerialPort(serialPortName, serialBaud, flowControl);
+        System.out.println("Opened serial port " + serialPortName + " at " + serialBaud);
+        dongle = new ZigBeeDongleEzsp(serialPort);
+
+        emberMfg = dongle.getEmberMfglib(new EmberMfglibListener() {
+            @Override
+            public synchronized void emberMfgLibPacketReceived(int lqi, int rssi, int[] data) {
+                packetReceived(sequence++, lqi, rssi, data);
+            }
+        });
+
+        String ncpVersion = dongle.getFirmwareVersion();
+        if (ncpVersion.equals("")) {
+            System.err.println("Unable to communicate with Ember NCP");
+            shutdown();
+            return false;
+        }
+        System.out.println("Ember NCP version     : " + ncpVersion);
+
+        emberNcp = dongle.getEmberNcp();
+        IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
+        System.out.println("Ember NCP EUI         : " + localIeeeAddress);
+
+        if (isdFile != null) {
+            SilabsAdapter adapter = new SilabsAdapter();
+            adapter.setAddress(localIeeeAddress);
+            isdFile.write(adapter);
+            SilabsVersion version = new SilabsVersion();
+            version.setVersion(dongle.getFirmwareVersion());
+            isdFile.write(version);
+            DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            Date date = new Date();
+            SilabsPrintf printf = new SilabsPrintf();
+            printf.setString("Logging started at " + dateFormat.format(date));
+            isdFile.write(printf);
+        }
+
+        if (!emberMfg.doMfglibStart()) {
+            System.err.println("Error starting Ember mfglib");
+            shutdown();
+            return false;
+        }
+        if (!emberMfg.doMfglibSetChannel(ZigBeeChannel.create(channelId))) {
+            System.err.println("Error setting Ember channel");
+            shutdown();
+            return false;
+        }
+
+        return true;
     }
 }
