@@ -197,7 +197,13 @@ public class WiresharkZepFrame extends ZigBeeSnifferBinaryFrame {
     }
 
     public byte[] getBuffer() {
-        // Patch FCS to be compatible with CC24xx format
+        // The IEEE 802.15.4 packet encapsulated in the ZEP frame must have the "TI CC24xx" format
+        // See figure 21 on page 24 of the CC2420 datasheet: https://www.ti.com/lit/ds/symlink/cc2420.pdf
+        // So, two bytes must be added at the end:
+        // * First byte: RSSI value as a signed 8 bits integer (range -128 to 127)
+        // * Second byte:
+        //   - the most significant bit is set to 1 of the CRC of the frame is correct
+        //   - the 7 least significant bits contain the LQI value as a unsigned 7 bits integer (range 0 to 127)
         data[data.length - 2] = rssi;
         data[data.length - 1] = 0x80 | ((lqi>>1) & 0x7F);
 
