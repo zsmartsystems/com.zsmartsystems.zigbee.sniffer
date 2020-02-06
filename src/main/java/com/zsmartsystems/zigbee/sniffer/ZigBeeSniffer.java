@@ -275,6 +275,7 @@ public class ZigBeeSniffer {
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
         zepFrame.setTimestamp(captureMillis + timezone);
+        zepFrame.setRssi(rssi);
         System.out.println(zepFrame);
 
         byte[] buffer = zepFrame.getBuffer();
