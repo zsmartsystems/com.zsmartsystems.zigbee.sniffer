@@ -181,7 +181,7 @@ public class WiresharkZepFrame extends ZigBeeSnifferBinaryFrame {
         this.protocolType = protocolType;
     }
 
-    public void serRssi(int rssi) {
+    public void setRssi(int rssi) {
         this.rssi = rssi;
     }
 
