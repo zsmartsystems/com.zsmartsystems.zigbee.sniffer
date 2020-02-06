@@ -199,7 +199,7 @@ public class WiresharkZepFrame extends ZigBeeSnifferBinaryFrame {
     public byte[] getBuffer() {
         // Patch FCS to be compatible with CC24xx format
         data[data.length - 2] = rssi;
-        data[data.length - 1] = 0x80;
+        data[data.length - 1] = 0x80 | ((lqi>>1) & 0x7F);
 
         serializeInt8(0x45);
         serializeInt8(0x58);
