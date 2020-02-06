@@ -272,6 +272,7 @@ public class ZigBeeSniffer {
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
         zepFrame.setLqi(lqi);
         zepFrame.setChannelId(channelId);
+        zepFrame.setDeviceId((localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
         zepFrame.setTimestamp(captureMillis + timezone);
