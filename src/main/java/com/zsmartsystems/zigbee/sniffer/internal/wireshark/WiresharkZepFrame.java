@@ -254,6 +254,8 @@ public class WiresharkZepFrame extends ZigBeeSnifferBinaryFrame {
         builder.append(String.format("%08X", sequence));
         builder.append(", lqi=");
         builder.append(lqi);
+        builder.append(", rssi=");
+        builder.append(rssi);
         builder.append(", data={");
         boolean first = true;
         for (int val : data) {
