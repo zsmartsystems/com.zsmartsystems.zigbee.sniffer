@@ -64,6 +64,7 @@ public class ZigBeeSniffer {
     static ZigBeeDongleEzsp dongle;
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
+    static IeeeAddress localIeeeAddress;
     static long timezone = 0;
     static int wiresharkFileLength = Integer.MAX_VALUE;
     static int wiresharkCounter = 0;
@@ -370,7 +371,7 @@ public class ZigBeeSniffer {
         System.out.println("Ember NCP version     : " + ncpVersion);
 
         emberNcp = dongle.getEmberNcp();
-        IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
+        localIeeeAddress = emberNcp.getIeeeAddress();
         System.out.println("Ember NCP EUI         : " + localIeeeAddress);
 
         if (isdFile != null) {
