@@ -264,7 +264,11 @@ public class ZigBeeSniffer {
                 } else {
                     System.out.println("Logging on channel    : " + channelId);
                 }
-                System.out.println("Device ID    : " + deviceId);
+                if(deviceId != null) {
+                    System.out.println("Device ID    : " + deviceId);
+                } else {
+                    System.out.println("No device ID set. Last 16 bits of device EUID will be used.");
+                }
 
                 captureMillis = System.currentTimeMillis();
                 while (!in.ready()) {
