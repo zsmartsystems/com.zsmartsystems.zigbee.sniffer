@@ -258,7 +258,13 @@ public class ZigBeeSniffer {
 
                 System.out.println("NCP initialisation complete...");
                 System.out.println("Wireshark destination : " + address + ":" + clientPort);
-                System.out.println("Logging on channel    : " + channelId);
+                if(channelRotationIntervalMillis != null) {
+                    System.out.println("Scanning channel range    : range = [" + channelRotationRangeStart
+                        + " , " + channelRotationRangeEnd + "] , interval = " + channelRotationIntervalMillis + " ms");
+                } else {
+                    System.out.println("Logging on channel    : " + channelId);
+                }
+                System.out.println("Device ID    : " + deviceId);
 
                 captureMillis = System.currentTimeMillis();
                 while (!in.ready()) {
@@ -270,11 +276,13 @@ public class ZigBeeSniffer {
                         }
                     } else if(System.currentTimeMillis() - lastChannelRotationTimestamp >= channelRotationIntervalMillis) {
                         final ZigBeeChannel nextChannel = getNextChannel();
+                        System.out.println("Setting channel " + nextChannel.getChannel());
                         if (!emberMfg.doMfglibSetChannel(nextChannel)) {
                             System.err.println("Error setting Ember channel");
                             break;
                         }
                         channelId = nextChannel.getChannel();
+                        lastChannelRotationTimestamp = System.currentTimeMillis();
                     }
                     Thread.sleep(250);
                 }
