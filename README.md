@@ -43,4 +43,4 @@ Using the "TI CC24xx" frame format permit passing the RSSI value but has also li
 
 The real LQI value reported by the module in the range 0 to 255 should be displayed in the ZigBee Encapsulation Protocol section, but due to a bug, this isn't actually the case (see https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=16369).
 
-Due to a limitation in the new Ember modules based on the EFR32, the LQI value isn't based on the bit error rate of the demodulator but is related to the RSSI value (see https://www.silabs.com/community/wireless/zigbee-and-thread/knowledge-base.entry.html/2017/08/15/lqi_in_silicon_labs-vvSq)
+For information on how the LQI is calculated in Silabs chips, refer to https://www.silabs.com/community/wireless/zigbee-and-thread/knowledge-base.entry.html/2017/08/15/lqi_in_silicon_labs-vvSq
