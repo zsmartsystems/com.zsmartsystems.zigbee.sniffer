@@ -88,8 +88,7 @@ public class ZigBeeSniffer {
         System.out.println("Z-Smart Systems Ember Packet Sniffer");
 
         Options options = new Options();
-        options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port")
-                .required().build());
+        options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port").build());
         options.addOption(
                 Option.builder("b").longOpt("baud").hasArg().argName("baud").desc("Set the port baud rate").build());
         options.addOption(Option.builder("f").longOpt("flow").hasArg().argName("type")
