@@ -56,6 +56,8 @@ import com.zsmartsystems.zigbee.transport.ZigBeePort.FlowControl;
 public class ZigBeeSniffer {
     static Integer channelId;
     static Integer channelRotationIntervalMillis;
+    static Integer channelRotationRangeStart;
+    static Integer channelRotationRangeEnd;
     static Long lastChannelRotationTimestamp;
     static int clientPort;
     static DatagramSocket client;
@@ -94,6 +96,10 @@ public class ZigBeeSniffer {
                 .desc("Set the ZigBee channel ID").build());
         options.addOption(Option.builder("o").longOpt("rotate").hasArg().argName("seconds")
                 .desc("Enable channel rotation and set rotation interval (seconds)").build());
+        options.addOption(Option.builder("w").longOpt("rotate-start").hasArg().argName("channel id")
+                .desc("Set the channel rotation range start").build());
+        options.addOption(Option.builder("e").longOpt("rotate-end").hasArg().argName("channel id")
+                .desc("Set the channel rotation range end").build());
         options.addOption(Option.builder("a").longOpt("ipaddr").hasArg().argName("remote IP address")
                 .desc("Set the remote IP address").build());
         options.addOption(Option.builder("r").longOpt("ipport").hasArg().argName("remote IP port")
@@ -200,14 +206,30 @@ public class ZigBeeSniffer {
             return;
         }
 
-        if (cmdline.hasOption("channel") && cmdline.hasOption("scan")) {
+        if (cmdline.hasOption("channel") && cmdline.hasOption("rotate")) {
             System.err.println("Either a specific channel should be set or scan rotation enabled, but not both");
             return;
         }
 
-        if (cmdline.hasOption("scan")) {
+        if (cmdline.hasOption("rotate")) {
             channelRotationIntervalMillis = Integer.parseInt(cmdline.getOptionValue("rotate")) * 1000;
-            channelId = 0;
+            if ((cmdline.hasOption("rotate-start") && !cmdline.hasOption("rotate-end"))
+                || (!cmdline.hasOption("rotate-start") && cmdline.hasOption("rotate-end")) {
+                System.err.println("Channel rotation range (start and end) must be provided together or not at all");
+                return;
+            }
+            if (cmdline.hasOption("rotate-start")) {
+                channelRotationRangeStart = parseDecimalOrHexInt(cmdline.getOptionValue("rotate-start"));
+                channelRotationRangeEnd = parseDecimalOrHexInt(cmdline.getOptionValue("rotate-end"));
+                if(channelRotationRangeStart > channelRotationRangeEnd) {
+                    System.err.println("Invalid channel rotation range provided");
+                    return;
+                }
+            } else {
+                channelRotationRangeStart = 11;
+                channelRotationRangeEnd = 26;
+            }
+            channelId = channelRotationRangeStart;
         } else {
             if (cmdline.hasOption("channel")) {
                 channelId = parseDecimalOrHexInt(cmdline.getOptionValue("channel"));
@@ -425,8 +447,8 @@ public class ZigBeeSniffer {
     }
 
     private static ZigBeeChannel getNextChannel() {
-        if (channelId == ZigBeeChannel.CHANNEL_26.getChannel()) {
-            return ZigBeeChannel.CHANNEL_00;
+        if (channelId == channelRotationRangeEnd) {
+            return ZigBeeChannel.create(channelRotationRangeStart);
         }
         return ZigBeeChannel.create(channelId + 1);
     }
