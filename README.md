@@ -10,6 +10,9 @@ usage: ZigBeeSniffer
 -a,--ipaddr <remote IP address>   Set the remote IP address
 -b,--baud <baud>                  Set the port baud rate
 -c,--channel <channel id>         Set the ZigBee channel ID
+-o,--rotate <seconds>             Enable channel rotation and set rotation interval (seconds)
+-w,--rotate-start <channel id>    Set the channel rotation range start
+-e,--rotate-end <channel id>      Set the channel rotation range end
 -f,--flow <type>                  Set the flow control (none | hardware | software)
 -l,--local                        Log times in local time
 -m,--maxpcap <length>             Maximum filesize for Wireshark files
