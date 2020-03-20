@@ -68,7 +68,7 @@ public class ZigBeeSniffer {
     static ZigBeeDongleEzsp dongle;
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
-    static String deviceId;
+    static Integer deviceId;
     static IeeeAddress localIeeeAddress;
     static long timezone = 0;
     static int wiresharkFileLength = Integer.MAX_VALUE;
@@ -218,7 +218,7 @@ public class ZigBeeSniffer {
         if (cmdline.hasOption("rotate")) {
             channelRotationIntervalMillis = Integer.parseInt(cmdline.getOptionValue("rotate")) * 1000;
             if ((cmdline.hasOption("rotate-start") && !cmdline.hasOption("rotate-end"))
-                || (!cmdline.hasOption("rotate-start") && cmdline.hasOption("rotate-end")) {
+                || (!cmdline.hasOption("rotate-start") && cmdline.hasOption("rotate-end"))) {
                 System.err.println("Channel rotation range (start and end) must be provided together or not at all");
                 return;
             }
@@ -243,7 +243,7 @@ public class ZigBeeSniffer {
         }
 
         if (cmdline.hasOption("device-id")) {
-            deviceId = cmdline.getOptionValue("device-id");
+            deviceId = parseDecimalOrHexInt(cmdline.getOptionValue("device-id"));
         }
 
         try {
@@ -325,7 +325,7 @@ public class ZigBeeSniffer {
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
         zepFrame.setLqi(lqi);
         zepFrame.setChannelId(channelId);
-        zepFrame.setDeviceId(deviceId ? deviceId : (localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
+        zepFrame.setDeviceId(deviceId != null ? deviceId : (localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
         zepFrame.setTimestamp(captureMillis + timezone);
