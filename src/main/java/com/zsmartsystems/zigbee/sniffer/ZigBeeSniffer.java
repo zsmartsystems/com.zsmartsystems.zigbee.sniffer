@@ -68,6 +68,8 @@ public class ZigBeeSniffer {
     static ZigBeeDongleEzsp dongle;
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
+    static String deviceId;
+    static IeeeAddress localIeeeAddress;
     static long timezone = 0;
     static int wiresharkFileLength = Integer.MAX_VALUE;
     static int wiresharkCounter = 0;
@@ -112,6 +114,8 @@ public class ZigBeeSniffer {
                 .desc("Maximum filesize for Wireshark files").build());
         options.addOption(Option.builder("t").longOpt("timeout").hasArg().argName("seconds")
                 .desc("NCP restart timeout in seconds").build());
+        options.addOption(Option.builder("d").longOpt("device-id").hasArg().argName("device-id")
+                .desc("Set the device ID that will be included in ZEP frame").build());
         options.addOption(Option.builder("l").longOpt("local").desc("Log times in local time").build());
         options.addOption(Option.builder("?").longOpt("help").desc("Print usage information").build());
 
@@ -238,6 +242,10 @@ public class ZigBeeSniffer {
             }
         }
 
+        if (cmdline.hasOption("device-id")) {
+            deviceId = cmdline.getOptionValue("device-id");
+        }
+
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
             while (!in.ready()) {
@@ -317,9 +325,11 @@ public class ZigBeeSniffer {
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
         zepFrame.setLqi(lqi);
         zepFrame.setChannelId(channelId);
+        zepFrame.setDeviceId(deviceId ? deviceId : (localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
         zepFrame.setTimestamp(captureMillis + timezone);
+        zepFrame.setRssi(rssi);
         System.out.println(zepFrame);
 
         byte[] buffer = zepFrame.getBuffer();
@@ -413,7 +423,7 @@ public class ZigBeeSniffer {
         System.out.println("Ember NCP version     : " + ncpVersion);
 
         emberNcp = dongle.getEmberNcp();
-        IeeeAddress localIeeeAddress = emberNcp.getIeeeAddress();
+        localIeeeAddress = emberNcp.getIeeeAddress();
         System.out.println("Ember NCP EUI         : " + localIeeeAddress);
 
         if (isdFile != null) {
