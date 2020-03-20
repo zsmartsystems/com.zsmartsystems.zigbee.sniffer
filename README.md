@@ -18,6 +18,7 @@ usage: ZigBeeSniffer
 -s,--silabs <filename>            Log data to a Silabs ISD compatible event log
 -t,--timeout <seconds>            NCP restart timeout in seconds
 -w,--pcap <filename>              Log data to a Wireshark pcap compatible log
+-d,--device-id <device-id>        Set the device ID that will be included in ZEP frame
 ```
 
 Note that the IP address will default to the local host on the assumption that you are running Wireshark on the same computer as the sniffer. The ```ipport``` will default to 17754 which is the port used for the ZigBee Encapsulation Protocol - changing this may stop Wireshark displaying ZigBee data.
