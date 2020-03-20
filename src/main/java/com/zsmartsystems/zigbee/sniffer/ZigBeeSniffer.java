@@ -68,7 +68,7 @@ public class ZigBeeSniffer {
     static ZigBeeDongleEzsp dongle;
     static EmberMfglib emberMfg;
     static EmberNcp emberNcp;
-    static String deviceId;
+    static Integer deviceId;
     static IeeeAddress localIeeeAddress;
     static long timezone = 0;
     static int wiresharkFileLength = Integer.MAX_VALUE;
@@ -88,8 +88,7 @@ public class ZigBeeSniffer {
         System.out.println("Z-Smart Systems Ember Packet Sniffer");
 
         Options options = new Options();
-        options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port")
-                .required().build());
+        options.addOption(Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port").build());
         options.addOption(
                 Option.builder("b").longOpt("baud").hasArg().argName("baud").desc("Set the port baud rate").build());
         options.addOption(Option.builder("f").longOpt("flow").hasArg().argName("type")
@@ -218,7 +217,7 @@ public class ZigBeeSniffer {
         if (cmdline.hasOption("rotate")) {
             channelRotationIntervalMillis = Integer.parseInt(cmdline.getOptionValue("rotate")) * 1000;
             if ((cmdline.hasOption("rotate-start") && !cmdline.hasOption("rotate-end"))
-                || (!cmdline.hasOption("rotate-start") && cmdline.hasOption("rotate-end")) {
+                || (!cmdline.hasOption("rotate-start") && cmdline.hasOption("rotate-end"))) {
                 System.err.println("Channel rotation range (start and end) must be provided together or not at all");
                 return;
             }
@@ -243,7 +242,7 @@ public class ZigBeeSniffer {
         }
 
         if (cmdline.hasOption("device-id")) {
-            deviceId = cmdline.getOptionValue("device-id");
+            deviceId = parseDecimalOrHexInt(cmdline.getOptionValue("device-id"));
         }
 
         try {
@@ -258,7 +257,17 @@ public class ZigBeeSniffer {
 
                 System.out.println("NCP initialisation complete...");
                 System.out.println("Wireshark destination : " + address + ":" + clientPort);
-                System.out.println("Logging on channel    : " + channelId);
+                if(channelRotationIntervalMillis != null) {
+                    System.out.println("Scanning channel range    : range = [" + channelRotationRangeStart
+                        + " , " + channelRotationRangeEnd + "] , interval = " + channelRotationIntervalMillis + " ms");
+                } else {
+                    System.out.println("Logging on channel    : " + channelId);
+                }
+                if(deviceId != null) {
+                    System.out.println("Device ID    : " + deviceId);
+                } else {
+                    System.out.println("No device ID set. Last 16 bits of device EUID will be used.");
+                }
 
                 captureMillis = System.currentTimeMillis();
                 while (!in.ready()) {
@@ -270,11 +279,13 @@ public class ZigBeeSniffer {
                         }
                     } else if(System.currentTimeMillis() - lastChannelRotationTimestamp >= channelRotationIntervalMillis) {
                         final ZigBeeChannel nextChannel = getNextChannel();
+                        System.out.println("Setting channel " + nextChannel.getChannel());
                         if (!emberMfg.doMfglibSetChannel(nextChannel)) {
                             System.err.println("Error setting Ember channel");
                             break;
                         }
                         channelId = nextChannel.getChannel();
+                        lastChannelRotationTimestamp = System.currentTimeMillis();
                     }
                     Thread.sleep(250);
                 }
@@ -325,7 +336,7 @@ public class ZigBeeSniffer {
         WiresharkZepFrame zepFrame = new WiresharkZepFrame();
         zepFrame.setLqi(lqi);
         zepFrame.setChannelId(channelId);
-        zepFrame.setDeviceId(deviceId ? deviceId : (localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
+        zepFrame.setDeviceId(deviceId != null ? deviceId : (localIeeeAddress.getValue()[1] << 8) + localIeeeAddress.getValue()[0]);
         zepFrame.setData(data);
         zepFrame.setSequence(sequence);
         zepFrame.setTimestamp(captureMillis + timezone);
