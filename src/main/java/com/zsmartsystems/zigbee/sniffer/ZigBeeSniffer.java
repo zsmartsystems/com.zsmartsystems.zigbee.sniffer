@@ -105,9 +105,9 @@ public class ZigBeeSniffer {
                 .desc("Set the channel rotation range end").build());
         options.addOption(Option.builder("a").longOpt("ipaddr").hasArg().argName("remote IP address")
                 .desc("Set the remote IP address").build());
-        options.addOption(Option.builder("r").longOpt("sport").hasArg().argName("source port")
+        options.addOption(Option.builder("k").longOpt("sport").hasArg().argName("source port")
                 .desc("Set the UDP source port (use 0 to let the system choose)").build());
-        options.addOption(Option.builder("k").longOpt("dport").hasArg().argName("destination port")
+        options.addOption(Option.builder("r").longOpt("dport").hasArg().argName("destination port")
                 .desc("Set the UDP destination port").build());
         options.addOption(Option.builder("s").longOpt("silabs").hasArg().argName("filename")
                 .desc("Log data to a Silabs ISD compatible event log").build());
