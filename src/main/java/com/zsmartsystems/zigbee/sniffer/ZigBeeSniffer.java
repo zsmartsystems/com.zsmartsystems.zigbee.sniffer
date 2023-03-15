@@ -59,7 +59,8 @@ public class ZigBeeSniffer {
     static Integer channelRotationRangeStart;
     static Integer channelRotationRangeEnd;
     static Long lastChannelRotationTimestamp;
-    static int clientPort;
+    static int sourcePort;
+    static int destinationPort;
     static DatagramSocket client;
     static InetAddress address;
     static SilabsIsdLogFile isdFile;
@@ -89,7 +90,7 @@ public class ZigBeeSniffer {
 
         Options options = new Options();
         options.addOption(
-                Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the port").build());
+                Option.builder("p").longOpt("port").argName("port name").hasArg().desc("Set the serial port").build());
         options.addOption(
                 Option.builder("b").longOpt("baud").hasArg().argName("baud").desc("Set the port baud rate").build());
         options.addOption(Option.builder("f").longOpt("flow").hasArg().argName("type")
@@ -104,8 +105,10 @@ public class ZigBeeSniffer {
                 .desc("Set the channel rotation range end").build());
         options.addOption(Option.builder("a").longOpt("ipaddr").hasArg().argName("remote IP address")
                 .desc("Set the remote IP address").build());
-        options.addOption(Option.builder("r").longOpt("ipport").hasArg().argName("remote IP port")
-                .desc("Set the remote IP port").build());
+        options.addOption(Option.builder("k").longOpt("sport").hasArg().argName("source port")
+                .desc("Set the UDP source port (use 0 to let the system choose)").build());
+        options.addOption(Option.builder("r").longOpt("dport").hasArg().argName("destination port")
+                .desc("Set the UDP destination port").build());
         options.addOption(Option.builder("s").longOpt("silabs").hasArg().argName("filename")
                 .desc("Log data to a Silabs ISD compatible event log").build());
         options.addOption(Option.builder("w").longOpt("pcap").hasArg().argName("filename")
@@ -192,6 +195,12 @@ public class ZigBeeSniffer {
             pcapFile = null;
         }
 
+        if (cmdline.hasOption("dport")) {
+            destinationPort = parseDecimalOrHexInt(cmdline.getOptionValue("dport"));
+        } else {
+            destinationPort = ZEP_UDP_PORT;
+        }
+
         try {
             if (cmdline.hasOption("ipaddr")) {
                 address = InetAddress.getByName(cmdline.getOptionValue("ipaddr"));
@@ -199,12 +208,13 @@ public class ZigBeeSniffer {
                 address = InetAddress.getByName("127.0.0.1");
             }
 
-            if (cmdline.hasOption("ipport")) {
-                clientPort = parseDecimalOrHexInt(cmdline.getOptionValue("ipport"));
+            if (cmdline.hasOption("sport")) {
+                sourcePort = parseDecimalOrHexInt(cmdline.getOptionValue("sport"));
             } else {
-                clientPort = ZEP_UDP_PORT;
+                sourcePort = ZEP_UDP_PORT;
             }
-            client = new DatagramSocket(ZEP_UDP_PORT);
+
+            client = new DatagramSocket(sourcePort);
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -257,7 +267,7 @@ public class ZigBeeSniffer {
                 }
 
                 System.out.println("NCP initialisation complete...");
-                System.out.println("Wireshark destination : " + address + ":" + clientPort);
+                System.out.println("Wireshark destination : " + address + ":" + destinationPort);
                 if (channelRotationIntervalMillis != null) {
                     System.out.println("Scanning channel range    : range = [" + channelRotationRangeStart
                             + " , " + channelRotationRangeEnd + "] , interval = " + channelRotationIntervalMillis
@@ -348,7 +358,7 @@ public class ZigBeeSniffer {
         System.out.println(zepFrame);
 
         byte[] buffer = zepFrame.getBuffer();
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, clientPort);
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, destinationPort);
         try {
             client.send(packet);
         } catch (IOException e) {
