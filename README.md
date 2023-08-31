@@ -36,7 +36,7 @@ The software will print an output to the console for each packet that is receive
 
 If the NCP fails to receive a valid frame with the timeout period set with the ```timeout``` command line parameter, then the NCP will be restarted. This will allow the sniffer to recover from serial port or NCP communications problems. The timer defaults to 30 seconds.
 
-A compiled JAR file can be found [here](https://www.opensmarthouse.org/files/download/ZigBeeSniffer.jar) along with [further documentation](https://www.opensmarthouse.org/files/download/ZigBeeWiresharkSniffer.pdf).
+A compiled JAR file can be found in the releases here on GitHub, along with [further documentation](https://www.opensmarthouse.org/files/download/ZigBeeWiresharkSniffer.pdf).
 
 When using Wireshark to display the packets, the raw IEEE 802.15.4 packet received by the Ember module is first encapsulated in a "TI CC24xx" frame format, then in a ZEPv2 (ZigBee Encapsulation Protocol version 2) frame format before being sent using UDP.
 Using the "TI CC24xx" frame format permit passing the RSSI value but has also limitations:
