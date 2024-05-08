@@ -3,13 +3,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.zsmartsystems.zigbee</groupId>
 	<artifactId>com.zsmartsystems.zigbee.sniffer</artifactId>
-	<version>1.0.1-SNAPSHOT</version>
+	<version>1.0.2</version>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
-		<zss.version>1.4.13</zss.version>
+		<zss.version>1.4.14</zss.version>
 	</properties>
 
 	<dependencies>
