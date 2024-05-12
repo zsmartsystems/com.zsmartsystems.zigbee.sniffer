@@ -26,6 +26,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 import com.zsmartsystems.zigbee.IeeeAddress;
 import com.zsmartsystems.zigbee.ZigBeeChannel;
@@ -83,8 +84,8 @@ public class ZigBeeSniffer {
         final int ZEP_UDP_PORT = 17754;
 
         final String serialPortName;
-        final Integer serialBaud;
-        FlowControl flowControl = null;
+        Integer serialBaud = 115200;
+        FlowControl flowControl = FlowControl.FLOWCONTROL_OUT_XONOFF;
 
         System.out.println("Z-Smart Systems Ember Packet Sniffer");
 
@@ -138,7 +139,10 @@ public class ZigBeeSniffer {
             }
 
             serialPortName = cmdline.getOptionValue("port");
-            serialBaud = parseDecimalOrHexInt(cmdline.getOptionValue("baud"));
+
+            if (cmdline.hasOption("baud")) {
+                serialBaud = parseDecimalOrHexInt(cmdline.getOptionValue("baud"));
+            }
 
             if (cmdline.hasOption("flow")) {
                 switch (cmdline.getOptionValue("flow").toLowerCase()) {
@@ -157,7 +161,7 @@ public class ZigBeeSniffer {
                         return;
                 }
             }
-        } catch (org.apache.commons.cli.ParseException exp) {
+        } catch (ParseException exp) {
             System.err.println("Parsing command line failed.  Reason: " + exp.getMessage());
             return;
         }
